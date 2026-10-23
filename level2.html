@@ -155,7 +155,7 @@
     <b>Ты освоил задачи на движение и стоимость!</b><br>
     Продолжение следует...
   </div>
-  <button class="intro-btn" id="nextBtn">УРОВЕНЬ 3 СКОРО</button>
+<button class="intro-btn" id="nextBtn">ПЕРЕЙТИ В ГЛАВУ 3 →</button>
 </div>
 
 <!-- Теория -->
@@ -810,8 +810,7 @@ document.getElementById('startBtn').addEventListener('click',()=>{
 });
 document.getElementById('nextBtn').addEventListener('click',()=>{
   initAudio(); sfxClick();
-  const b=document.getElementById('nextBtn');
-  b.textContent='УРОВЕНЬ 3 СКОРО'; b.disabled=true; b.style.opacity='0.5';
+  window.location.href = 'level3.html'; // Переход на третий уровень
 });
 
 // Hover
