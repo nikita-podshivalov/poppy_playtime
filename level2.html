@@ -1,0 +1,838 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#05030a">
+<title>ПОБЕГ С ФАБРИКИ · Глава 2</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:#05030a;
+    font-family:'Trebuchet MS',system-ui,sans-serif;
+    user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+  canvas{position:fixed;inset:0;display:block;touch-action:none}
+  #scanlines{position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0.18) 0px,rgba(0,0,0,0.18) 1px,transparent 1px,transparent 3px);
+    opacity:.35}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:49;
+    background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.78) 100%)}
+  #hud{position:fixed;top:0;left:0;right:0;z-index:20;
+    display:flex;justify-content:space-between;gap:8px;
+    padding:10px 14px;pointer-events:none}
+  .chip{padding:7px 12px;border-radius:8px;
+    font-size:clamp(10px,1.3vw,13px);font-weight:800;letter-spacing:2px;
+    background:rgba(10,6,18,.85);border:1px solid rgba(0,229,255,.25);
+    color:#8fd8ff;white-space:nowrap}
+  #objective{color:#ffd166;border-color:rgba(255,209,102,.35)}
+  #hint{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);
+    max-width:90vw;padding:12px 20px;
+    font-size:clamp(12px,1.5vw,15px);line-height:1.5;
+    background:rgba(10,6,18,.95);border:1px solid rgba(0,229,255,.4);
+    border-radius:10px;color:#cfe8ff;text-align:center;
+    z-index:25;opacity:0;transition:opacity .3s;pointer-events:none}
+  #hint.show{opacity:1}
+  #hint b{color:#7dffcb}
+  #speech{position:fixed;z-index:26;padding:10px 14px;
+    background:rgba(250,240,220,.96);color:#2a0a1a;border-radius:12px;
+    font-size:13px;font-weight:700;line-height:1.4;max-width:240px;
+    box-shadow:0 4px 20px rgba(0,0,0,.6);
+    opacity:0;transition:opacity .2s;pointer-events:none}
+  #speech.show{opacity:1}
+  #speech::after{content:'';position:absolute;bottom:-8px;left:20px;
+    width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;
+    border-top:8px solid rgba(250,240,220,.96)}
+  #flash{position:fixed;inset:0;z-index:45;pointer-events:none;
+    opacity:0;background:#fff;transition:opacity .2s}
+  .modal{position:fixed;inset:0;z-index:30;
+    display:flex;align-items:center;justify-content:center;padding:20px;
+    background:rgba(2,1,6,.88);
+    backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);
+    opacity:0;pointer-events:none;transition:opacity .25s}
+  .modal.show{opacity:1;pointer-events:auto}
+  .modal-card{width:min(560px,92vw);
+    background:linear-gradient(180deg,rgba(16,9,26,.99),rgba(6,4,12,.99));
+    border:1px solid rgba(0,229,255,.35);border-radius:12px;padding:26px;
+    box-shadow:0 0 80px rgba(0,0,0,.95),inset 0 0 60px rgba(0,229,255,.04);
+    max-height:88vh;overflow-y:auto}
+  .modal-kicker{font-size:10px;letter-spacing:5px;font-weight:800;
+    color:rgba(0,229,255,.6);margin-bottom:10px}
+  .modal-title{font-size:clamp(20px,3vw,28px);font-weight:900;color:#eaf9ff;
+    letter-spacing:2px;margin-bottom:16px;line-height:1.2}
+  .modal-text{font-size:clamp(14px,1.8vw,17px);line-height:1.6;color:#d0c0e0;
+    margin-bottom:16px}
+  .modal-text b{color:#ffd166}
+  .modal-text .gold{color:#ffd166;font-weight:800}
+  .modal-input{width:100%;padding:14px;margin:8px 0;
+    font-family:inherit;font-size:24px;font-weight:900;text-align:center;
+    color:#fff;background:rgba(0,20,40,.6);
+    border:2px solid rgba(0,229,255,.4);border-radius:10px;outline:none}
+  .modal-input:focus{border-color:#00e5ff;box-shadow:0 0 24px rgba(0,229,255,.3)}
+  .modal-input.correct{border-color:#1ee68f;color:#bfffe0}
+  .modal-input.wrong{border-color:#ff3b6b;animation:shake .4s}
+  @keyframes shake{0%,100%{transform:translateX(0)}
+    20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .modal-btn{width:100%;padding:15px;font-family:inherit;
+    font-size:clamp(14px,1.8vw,17px);font-weight:900;letter-spacing:3px;
+    color:#04121e;border:none;border-radius:10px;
+    background:linear-gradient(180deg,#5cf0ff,#00b8e6);cursor:pointer;
+    transition:all .15s;margin-top:8px}
+  .modal-btn:hover{filter:brightness(1.1);transform:translateY(-1px)}
+  .modal-btn.gold{background:linear-gradient(180deg,#ffd166,#ffb703)}
+  .keypad-display{text-align:center;padding:16px;margin-bottom:8px;
+    font-size:32px;font-weight:900;letter-spacing:8px;color:#fff;
+    background:rgba(0,10,20,.8);border:2px solid rgba(0,229,255,.5);
+    border-radius:10px;min-height:64px;font-variant-numeric:tabular-nums}
+  .keypad-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:16px 0}
+  .keypad-key{padding:16px;font-family:inherit;font-size:22px;font-weight:900;
+    color:#cfe8ff;background:rgba(20,30,50,.7);
+    border:1.5px solid rgba(0,229,255,.3);border-radius:10px;
+    cursor:pointer;transition:all .1s}
+  .keypad-key:hover{background:rgba(30,55,85,.9)}
+  .keypad-key:active{transform:scale(.95)}
+  .keypad-key.del{color:#ff8fb3}
+  .keypad-key.ok{color:#7dffcb}
+  #intro,#victory{position:fixed;inset:0;z-index:40;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;padding:24px;text-align:center;
+    background:radial-gradient(circle at 50% 45%,rgba(30,10,40,.93),rgba(2,1,6,.99))}
+  #intro.hidden,#victory.hidden{display:none}
+  .intro-kicker{font-size:11px;letter-spacing:8px;font-weight:800;
+    color:rgba(0,229,255,.55)}
+  .intro-title{font-size:clamp(30px,7vw,60px);font-weight:900;letter-spacing:5px;
+    line-height:1;color:#ffe8f0;
+    text-shadow:0 0 30px #ff1e56,0 0 80px rgba(255,30,86,.5)}
+  .intro-sub{font-size:clamp(12px,1.6vw,15px);letter-spacing:5px;
+    font-weight:700;color:#b07cd0}
+  .intro-desc{font-size:clamp(14px,1.8vw,17px);line-height:1.65;
+    color:#c0a8d0;max-width:520px}
+  .intro-desc b{color:#ffd166}
+  .intro-btn{margin-top:8px;padding:16px 48px;font-family:inherit;
+    font-size:clamp(16px,2vw,20px);font-weight:900;letter-spacing:4px;
+    color:#1a0210;border:none;border-radius:12px;cursor:pointer;
+    background:linear-gradient(180deg,#ff5c8a,#d61e58);
+    box-shadow:0 0 36px rgba(255,30,86,.55);transition:all .15s}
+  .intro-btn:hover{transform:translateY(-2px);box-shadow:0 0 56px rgba(255,30,86,.9)}
+  .theory-block{background:rgba(0,229,255,.06);border-left:4px solid #00e5ff;
+    padding:14px 16px;border-radius:0 8px 8px 0;margin:12px 0;
+    font-size:clamp(14px,1.7vw,16px);line-height:1.7;color:#cfe8ff}
+  .theory-block .formula{display:block;margin:8px 0;font-size:1.2em;
+    font-weight:900;color:#7dffcb;letter-spacing:1px}
+</style>
+</head>
+<body>
+<canvas id="cv"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+<div id="flash"></div>
+
+<div id="hud">
+  <div class="chip" id="objective">ЗАДАЧА: Найди выход из коридора</div>
+  <div class="chip">ГЛАВА 2 · ЗАБРОШЕННЫЙ КОРИДОР</div>
+</div>
+
+<div id="hint"></div>
+<div id="speech"></div>
+
+<div id="intro">
+  <div class="intro-kicker">PLAYTIME CO. · ГЛАВА 2</div>
+  <h1 class="intro-title">ЗАБРОШЕННЫЙ<br>КОРИДОР</h1>
+  <div class="intro-sub">МАТЕМАТИЧЕСКИЙ ПОБЕГ</div>
+  <div class="intro-desc">
+    Ты выбежал из тёмной комнаты и оказался в длинном коридоре.<br>
+    Где-то позади — шаги. Впереди — три двери и странная доска.<br><br>
+    <b>Изучи теорию, реши задачи и пройди проверку счёта —</b><br>
+    иначе Хагги Вагги догонит тебя.
+  </div>
+  <button class="intro-btn" id="startBtn">НАЧАТЬ</button>
+</div>
+
+<div id="victory" class="hidden">
+  <div class="intro-kicker">ГЛАВА 2 · ЗАВЕРШЕНА</div>
+  <h1 class="intro-title">ТЫ ПРОШЁЛ<br>КОРИДОР</h1>
+  <div class="intro-desc">
+    Ты открыл последнюю дверь и выбежал на лестницу.<br>
+    Шаги остались позади... пока что.<br><br>
+    <b>Ты освоил задачи на движение и стоимость!</b><br>
+    Продолжение следует...
+  </div>
+  <button class="intro-btn" id="nextBtn">УРОВЕНЬ 3 СКОРО</button>
+</div>
+
+<!-- Теория -->
+<div id="theoryModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-kicker">ДОСКА С ТЕОРИЕЙ</div>
+    <div class="modal-title">ЗАПИШИ В ТЕТРАДЬ</div>
+    <div class="theory-block">
+      <b>Задачи на движение:</b><br>
+      <span class="formula">S = V × t</span>
+      Расстояние = Скорость × Время<br><br>
+      <span class="formula">V = S ÷ t</span>
+      Скорость = Расстояние ÷ Время<br><br>
+      <span class="formula">t = S ÷ V</span>
+      Время = Расстояние ÷ Скорость
+    </div>
+    <div class="theory-block">
+      <b>Задачи на стоимость:</b><br>
+      <span class="formula">C = Ц × К</span>
+      Стоимость = Цена × Количество
+    </div>
+    <div class="modal-text" style="margin-top:12px;font-size:13px;color:#9a8ab0">
+      💡 Совет: закрой неизвестную величину пальцем — оставшиеся покажут действие.
+    </div>
+    <button class="modal-btn gold" id="theoryBtn">ЗАПИСАЛ(А) В ТЕТРАДЬ →</button>
+  </div>
+</div>
+
+<!-- Задача 1 (движение) -->
+<div id="task1Modal" class="modal">
+  <div class="modal-card">
+    <div class="modal-kicker">ЗАДАЧА 1 · ДВИЖЕНИЕ</div>
+    <div class="modal-title">ДОГОНИШЬ ЛИ ТЫ?</div>
+    <div class="modal-text">
+      Ты бежишь по коридору со скоростью <b>4 метра в секунду</b>.<br>
+      Ты бежал уже <b>12 секунд</b>.<br><br>
+      Какое расстояние ты пробежал?
+    </div>
+    <input type="text" inputmode="numeric" class="modal-input" id="task1Input" placeholder="?" autocomplete="off">
+    <div class="modal-text" id="task1Feedback" style="min-height:24px;margin:8px 0;text-align:center"></div>
+    <button class="modal-btn" id="task1Submit">ПРОВЕРИТЬ</button>
+  </div>
+</div>
+
+<!-- Задача 2 (стоимость) -->
+<div id="task2Modal" class="modal">
+  <div class="modal-card">
+    <div class="modal-kicker">ЗАДАЧА 2 · СТОИМОСТЬ</div>
+    <div class="modal-title">СКОЛЬКО МОНЕТ?</div>
+    <div class="modal-text">
+      В автомате с игрушками одна игрушка стоит <b>25 монет</b>.<br>
+      Ты хочешь купить <b>4 игрушки</b>.<br><br>
+      Сколько монет нужно заплатить?
+    </div>
+    <input type="text" inputmode="numeric" class="modal-input" id="task2Input" placeholder="?" autocomplete="off">
+    <div class="modal-text" id="task2Feedback" style="min-height:24px;margin:8px 0;text-align:center"></div>
+    <button class="modal-btn" id="task2Submit">ПРОВЕРИТЬ</button>
+  </div>
+</div>
+
+<!-- Мини-игра: устный счёт -->
+<div id="mathGameModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-kicker">ТРЕНАЖЁР УСТНОГО СЧЁТА</div>
+    <div class="modal-title">СЛОЖЕНИЕ В СТОЛБИК</div>
+    <div class="modal-text" style="text-align:center">
+      Реши примеры. У тебя <b>3 попытки</b> на каждый.
+    </div>
+    <div id="mathGameArea" style="margin:16px 0">
+      <div style="font-size:32px;font-weight:900;text-align:center;color:#fff;margin-bottom:12px" id="mgExpression">—</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px" id="mgOptions"></div>
+    </div>
+    <div class="modal-text" id="mgFeedback" style="min-height:24px;text-align:center;margin:8px 0"></div>
+    <button class="modal-btn" id="mathGameClose" style="background:rgba(60,60,80,.6);color:#aaa">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<!-- Дверь с кодом -->
+<div id="keypadModal" class="modal">
+  <div class="modal-card">
+    <div class="modal-kicker">ПАНЕЛЬ У ДВЕРИ</div>
+    <div class="modal-title">ВВЕДИ КОД</div>
+    <div class="modal-text" style="text-align:center;font-size:15px;color:#9a8ab0">
+      Подсказка: код — это сумма ответов двух задач.
+    </div>
+    <div class="keypad-display" id="keypadDisplay">_ _ _</div>
+    <div class="keypad-grid" id="keypadGrid">
+      <button class="keypad-key" data-key="1">1</button>
+      <button class="keypad-key" data-key="2">2</button>
+      <button class="keypad-key" data-key="3">3</button>
+      <button class="keypad-key" data-key="4">4</button>
+      <button class="keypad-key" data-key="5">5</button>
+      <button class="keypad-key" data-key="6">6</button>
+      <button class="keypad-key" data-key="7">7</button>
+      <button class="keypad-key" data-key="8">8</button>
+      <button class="keypad-key" data-key="9">9</button>
+      <button class="keypad-key del" data-key="DEL">✕</button>
+      <button class="keypad-key" data-key="0">0</button>
+      <button class="keypad-key ok" data-key="OK">✓</button>
+    </div>
+    <button class="modal-btn" id="keypadClose" style="background:rgba(60,60,80,.6);color:#aaa">ЗАКРЫТЬ</button>
+  </div>
+</div>
+
+<script>
+(function(){
+'use strict';
+
+/* ==================== CANVAS ==================== */
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+let W = 0, H = 0, DPR = 1;
+function resize(){
+  DPR = Math.min(window.devicePixelRatio || 1, 2);
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.floor(W*DPR); cv.height = Math.floor(H*DPR);
+  cv.style.width = W+'px'; cv.style.height = H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize); resize();
+
+/* ==================== SOUND ==================== */
+let actx = null;
+function initAudio(){ if(!actx){ try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(actx && actx.state==='suspended') actx.resume(); }
+function tone(freq,dur,type,vol,delay){ if(!actx) return; type=type||'square'; vol=vol==null?0.05:vol; delay=delay||0;
+  const t0=actx.currentTime+delay; const o=actx.createOscillator(), g=actx.createGain();
+  o.type=type; o.frequency.setValueAtTime(freq,t0);
+  g.gain.setValueAtTime(0.0001,t0); g.gain.exponentialRampToValueAtTime(vol,t0+0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+dur);
+  o.connect(g); g.connect(actx.destination); o.start(t0); o.stop(t0+dur+0.05); }
+const sfxClick=()=>tone(520,.05,'sine',.03,0);
+const sfxGood=()=>{tone(660,.09,'square',.05,0);tone(880,.09,'square',.05,.08);tone(1180,.14,'square',.045,.16);};
+const sfxBad=()=>{tone(210,.16,'sawtooth',.05,0);tone(140,.3,'sawtooth',.045,.1);};
+const sfxOpen=()=>{[400,500,600,800,1000].forEach((f,i)=>tone(f,.15,'triangle',.05,i*.07));};
+const sfxScare=()=>{tone(80,.8,'sawtooth',.08,0);tone(60,1.0,'sawtooth',.07,.15);};
+
+/* ==================== SPRITES ==================== */
+function loadImg(src){ const i = new Image(); i.src = src; return i; }
+const SPRITES = {
+  poppy:      loadImg('poppy.png'),
+  huggy:      loadImg('huggy.png'),
+  board:      loadImg('board.png')
+};
+function spriteOk(img){ return img && img.complete && img.naturalWidth > 0; }
+function drawSpriteFit(img, x, y, w, h, alpha){
+  if(!spriteOk(img)) return false;
+  const ar = img.naturalWidth / img.naturalHeight;
+  const boxAr = w / h;
+  let dw, dh, dx, dy;
+  if(ar > boxAr){ dw = w; dh = w / ar; dx = x; dy = y + (h - dh)/2; }
+  else         { dh = h; dw = h * ar; dy = y; dx = x + (w - dw)/2; }
+  ctx.save();
+  if(alpha != null) ctx.globalAlpha = alpha;
+  ctx.drawImage(img, dx, dy, dw, dh);
+  ctx.restore();
+  return true;
+}
+
+/* ==================== STATE ==================== */
+const state = {
+  theoryRead: false,
+  task1Solved: false,
+  task2Solved: false,
+  mathGameWon: false,
+  doorOpen: false,
+  huggyVisible: false,
+  huggyAlpha: 0,
+  t: 0,
+  hover: null,
+  keypadInput: '',
+  code: 0,
+  gameStarted: false,
+  shakeAmt: 0
+};
+
+/* ==================== OBJECTS ==================== */
+const OBJ = {
+  door:    { nx:0.72, ny:0.22, nw:0.18, nh:0.52 },
+  keypad:  { nx:0.68, ny:0.42, nw:0.05, nh:0.10 },
+  board:   { nx:0.40, ny:0.18, nw:0.22, nh:0.16 },
+  poppy:   { nx:0.08, ny:0.35, nw:0.08, nh:0.15 },
+  task1:   { nx:0.20, ny:0.55, nw:0.10, nh:0.08 },
+  task2:   { nx:0.55, ny:0.55, nw:0.10, nh:0.08 },
+  mathGame:{ nx:0.35, ny:0.55, nw:0.10, nh:0.08 },
+  huggy:   { nx:0.30, ny:0.10, nw:0.35, nh:0.70 }
+};
+function hit(px,py,o,scale){ scale=scale||1;
+  const cx=(o.nx+o.nw/2)*W, cy=(o.ny+o.nh/2)*H;
+  const w=o.nw*W*scale, h=o.nh*H*scale;
+  return px>=cx-w/2 && px<=cx+w/2 && py>=cy-h/2 && py<=cy+h/2; }
+function center(o){ return { x:(o.nx+o.nw/2)*W, y:(o.ny+o.nh/2)*H }; }
+
+/* ==================== UI ==================== */
+function showHint(text,ms){ const el=document.getElementById('hint');
+  el.innerHTML=text; el.classList.add('show');
+  clearTimeout(showHint._t); showHint._t=setTimeout(()=>el.classList.remove('show'),ms||4000); }
+function hideHint(){ document.getElementById('hint').classList.remove('show'); }
+function showSpeech(text,x,y){ const el=document.getElementById('speech');
+  el.textContent=text;
+  el.style.left=Math.max(10,Math.min(W-250,x-100))+'px';
+  el.style.top=Math.max(60,y-90)+'px';
+  el.classList.add('show');
+  clearTimeout(showSpeech._t); showSpeech._t=setTimeout(()=>el.classList.remove('show'),4500); }
+function flash(){ const f=document.getElementById('flash'); f.style.opacity='0.4'; setTimeout(()=>{f.style.opacity='0';},150); }
+function setObjective(t){ document.getElementById('objective').textContent=t; }
+
+/* ==================== INTERACTION ==================== */
+function handleClick(px,py){
+  if(state.doorOpen) return; initAudio();
+
+  if(hit(px,py,OBJ.poppy,1.4)){ sfxClick(); poppyHint(); return; }
+
+  if(hit(px,py,OBJ.board,1.3)){ sfxClick(); openTheory(); return; }
+
+  if(hit(px,py,OBJ.task1,1.4)){ sfxClick();
+    if(state.task1Solved) showHint('Ты уже решил эту задачу.');
+    else openTask1();
+    return; }
+
+  if(hit(px,py,OBJ.task2,1.4)){ sfxClick();
+    if(!state.task1Solved){ showHint('Сначала реши первую задачу.'); return; }
+    if(state.task2Solved) showHint('Ты уже решил эту задачу.');
+    else openTask2();
+    return; }
+
+  if(hit(px,py,OBJ.mathGame,1.4)){ sfxClick();
+    if(!state.task2Solved){ showHint('Сначала реши две задачи.'); return; }
+    if(state.mathGameWon) showHint('Тренажёр уже пройден.');
+    else openMathGame();
+    return; }
+
+  if(hit(px,py,OBJ.keypad,1.5) || hit(px,py,OBJ.door)){ sfxClick();
+    if(!state.mathGameWon) showHint('Сначала пройди все испытания.');
+    else openKeypad();
+    return; }
+
+  if(!state.theoryRead) showHint('Сначала изучи доску с теорией.');
+}
+
+function poppyHint(){
+  let text;
+  if(!state.theoryRead) text='Поппи шепчет: «Начни с доски. Там формулы...»';
+  else if(!state.task1Solved) text='Поппи шепчет: «Слева — задача на движение...»';
+  else if(!state.task2Solved) text='Поппи шепчет: «Теперь задача на стоимость...»';
+  else if(!state.mathGameWon) text='Поппи шепчет: «Проверь счёт в тренажёре...»';
+  else text='Поппи шепчет: «Введи код на панели у двери...»';
+  const c=center(OBJ.poppy); showSpeech(text,c.x,c.y);
+}
+
+/* ==================== THEORY ==================== */
+function openTheory(){ hideHint();
+  document.getElementById('theoryModal').classList.add('show');
+}
+document.getElementById('theoryBtn').addEventListener('click',()=>{
+  sfxGood(); flash(); state.theoryRead=true;
+  document.getElementById('theoryModal').classList.remove('show');
+  setObjective('Реши две задачи');
+  showHint('Теория записана. Теперь реши задачи.');
+});
+
+/* ==================== TASK 1 ==================== */
+function openTask1(){
+  const input=document.getElementById('task1Input'), fb=document.getElementById('task1Feedback');
+  input.value=''; input.disabled=false; input.className='modal-input'; fb.textContent='';
+  document.getElementById('task1Modal').classList.add('show');
+  setTimeout(()=>input.focus(),100);
+}
+document.getElementById('task1Submit').addEventListener('click',()=>{
+  const input=document.getElementById('task1Input'), fb=document.getElementById('task1Feedback');
+  const val=parseInt(input.value,10);
+  if(isNaN(val)){ fb.textContent='Введи число.'; fb.style.color='#ff8fb3'; return; }
+  if(val===48){
+    sfxGood(); flash(); input.classList.add('correct'); input.disabled=true;
+    fb.innerHTML='<b style="color:#1ee68f">ВЕРНО! 4 × 12 = 48 метров.</b>';
+    state.task1Solved=true;
+    setTimeout(()=>{ document.getElementById('task1Modal').classList.remove('show');
+      setObjective('Реши задачу на стоимость'); },1800);
+  } else {
+    sfxBad(); input.classList.add('wrong');
+    fb.textContent='Неверно. Подсказка: S = V × t. Умножь 4 на 12.';
+    fb.style.color='#ff8fb3';
+    setTimeout(()=>input.classList.remove('wrong'),500);
+  }
+});
+
+/* ==================== TASK 2 ==================== */
+function openTask2(){
+  const input=document.getElementById('task2Input'), fb=document.getElementById('task2Feedback');
+  input.value=''; input.disabled=false; input.className='modal-input'; fb.textContent='';
+  document.getElementById('task2Modal').classList.add('show');
+  setTimeout(()=>input.focus(),100);
+}
+document.getElementById('task2Submit').addEventListener('click',()=>{
+  const input=document.getElementById('task2Input'), fb=document.getElementById('task2Feedback');
+  const val=parseInt(input.value,10);
+  if(isNaN(val)){ fb.textContent='Введи число.'; fb.style.color='#ff8fb3'; return; }
+  if(val===100){
+    sfxGood(); flash(); input.classList.add('correct'); input.disabled=true;
+    fb.innerHTML='<b style="color:#1ee68f">ВЕРНО! 25 × 4 = 100 монет.</b>';
+    state.task2Solved=true;
+    setTimeout(()=>{ document.getElementById('task2Modal').classList.remove('show');
+      setObjective('Пройди тренажёр счёта'); },1800);
+  } else {
+    sfxBad(); input.classList.add('wrong');
+    fb.textContent='Неверно. Подсказка: C = Цена × Количество. Умножь 25 на 4.';
+    fb.style.color='#ff8fb3';
+    setTimeout(()=>input.classList.remove('wrong'),500);
+  }
+});
+
+/* ==================== MINI-GAME: MATH ==================== */
+let mgCurrent = 0;
+const mgTasks = [
+  { a: 34, b: 25, answer: 59 },
+  { a: 47, b: 38, answer: 85 },
+  { a: 56, b: 17, answer: 73 }
+];
+let mgAttempts = 0;
+
+function openMathGame(){
+  mgCurrent = 0; mgAttempts = 0;
+  document.getElementById('mathGameModal').classList.add('show');
+  renderMathGame();
+}
+
+function renderMathGame(){
+  const task = mgTasks[mgCurrent];
+  document.getElementById('mgExpression').textContent = `${task.a} + ${task.b} = ?`;
+  const opts = document.getElementById('mgOptions');
+  opts.innerHTML = '';
+  // Варианты: правильный + 2 неправильных
+  const wrong1 = task.answer + 1 + Math.floor(Math.random()*5);
+  const wrong2 = task.answer - 1 - Math.floor(Math.random()*5);
+  const options = [task.answer, wrong1, wrong2].sort(()=>Math.random()-0.5);
+  options.forEach(v=>{
+    const b = document.createElement('button');
+    b.className = 'modal-btn';
+    b.textContent = v;
+    b.style.background = 'rgba(20,30,50,.8)';
+    b.style.color = '#cfe8ff';
+    b.addEventListener('click', ()=>{ initAudio(); checkMgAnswer(v, b); });
+    opts.appendChild(b);
+  });
+  document.getElementById('mgFeedback').textContent = '';
+}
+
+function checkMgAnswer(v, btn){
+  const task = mgTasks[mgCurrent];
+  if(v === task.answer){
+    sfxGood(); flash(); btn.style.background = '#1ee68f'; btn.style.color = '#031a10';
+    document.getElementById('mgFeedback').innerHTML = '<b style="color:#1ee68f">Верно!</b>';
+    setTimeout(()=>{
+      mgCurrent++;
+      if(mgCurrent >= mgTasks.length){
+        // Победа
+        state.mathGameWon = true;
+        document.getElementById('mathGameModal').classList.remove('show');
+        setObjective('Введи код на панели у двери');
+        showHint('Тренажёр пройден! Теперь введи код на панели.');
+        state.code = 48 + 100; // 148
+      } else {
+        renderMathGame();
+      }
+    }, 700);
+  } else {
+    sfxBad(); btn.style.background = '#ff3b6b'; btn.style.color = '#fff';
+    mgAttempts++;
+    document.getElementById('mgFeedback').textContent = 'Неверно. Попробуй ещё.';
+    document.getElementById('mgFeedback').style.color = '#ff8fb3';
+    setTimeout(()=>{
+      if(mgAttempts >= 3){
+        // Показываем подсказку
+        document.getElementById('mgFeedback').innerHTML = '<b style="color:#ffd166">Подсказка:</b> сложи единицы, затем десятки.';
+        mgAttempts = 0;
+      }
+      renderMathGame();
+    }, 600);
+  }
+}
+
+document.getElementById('mathGameClose').addEventListener('click',()=>{
+  document.getElementById('mathGameModal').classList.remove('show');
+});
+
+/* ==================== KEYPAD ==================== */
+function openKeypad(){
+  hideHint(); state.keypadInput=''; updateKeypadDisplay();
+  document.getElementById('keypadModal').classList.add('show');
+}
+function updateKeypadDisplay(){ document.getElementById('keypadDisplay').textContent = state.keypadInput || '_ _ _'; }
+document.querySelectorAll('.keypad-key').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    initAudio(); sfxClick();
+    const key=btn.dataset.key;
+    if(key==='DEL') state.keypadInput=state.keypadInput.slice(0,-1);
+    else if(key==='OK'){
+      if(state.keypadInput===String(state.code)){
+        sfxOpen(); flash(); state.doorOpen=true;
+        document.getElementById('keypadModal').classList.remove('show');
+        setObjective('Беги!');
+        setTimeout(()=>{ state.huggyVisible=true; sfxScare(); state.shakeAmt=20; },800);
+        setTimeout(()=>{ document.getElementById('victory').classList.remove('hidden'); },2800);
+      } else {
+        sfxBad(); state.keypadInput='';
+        const d=document.getElementById('keypadDisplay');
+        d.style.borderColor='#ff3b6b'; d.style.animation='shake .4s';
+        setTimeout(()=>{ d.style.borderColor=''; d.style.animation=''; },500);
+      }
+    } else if(state.keypadInput.length<4) state.keypadInput+=key;
+    updateKeypadDisplay();
+  });
+});
+document.getElementById('keypadClose').addEventListener('click',()=>{ document.getElementById('keypadModal').classList.remove('show'); });
+
+/* ==================== DUST ==================== */
+const dust=[];
+for(let i=0;i<70;i++) dust.push({ x:Math.random(), y:Math.random(),
+  r:0.5+Math.random()*1.5, vx:(Math.random()-.5)*.012, vy:-.004-Math.random()*.008,
+  a:.1+Math.random()*.3, p:Math.random()*6.28 });
+function drawDust(t){
+  for(const d of dust){
+    d.x+=d.vx*.016; d.y+=d.vy*.016;
+    if(d.y<-.02){ d.y=1.02; d.x=Math.random(); }
+    if(d.x<-.02) d.x=1.02; if(d.x>1.02) d.x=-.02;
+    const a=d.a*(.4+.6*Math.abs(Math.sin(t*1.5+d.p)));
+    ctx.fillStyle='rgba(180,150,220,'+a+')';
+    ctx.beginPath(); ctx.arc(d.x*W,d.y*H,d.r,0,Math.PI*2); ctx.fill();
+  }
+}
+
+/* ==================== DRAW ==================== */
+function drawBg(){
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,'#0a0812'); g.addColorStop(0.5,'#120a18'); g.addColorStop(1,'#05030a');
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  const floorY=H*0.75;
+  ctx.fillStyle='#0a0612'; ctx.fillRect(0,floorY,W,H-floorY);
+  ctx.strokeStyle='rgba(80,50,100,0.3)'; ctx.lineWidth=2;
+  ctx.beginPath(); ctx.moveTo(0,floorY); ctx.lineTo(W,floorY); ctx.stroke();
+  // линии перспективы
+  ctx.strokeStyle='rgba(80,50,120,0.1)'; ctx.lineWidth=1;
+  for(let i=0;i<=8;i++){ const x=(i/8)*W; ctx.beginPath(); ctx.moveTo(W/2,floorY); ctx.lineTo(x,H); ctx.stroke(); }
+}
+
+function drawBoard(){
+  const o=OBJ.board;
+  const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+  // рамка
+  ctx.fillStyle='#3a2a18';
+  ctx.fillRect(x-4,y-4,w+8,h+8);
+  // доска
+  const pg=ctx.createLinearGradient(x,y,x,y+h);
+  pg.addColorStop(0,'#2a4a2a'); pg.addColorStop(1,'#1a3a1a');
+  ctx.fillStyle=pg; ctx.fillRect(x,y,w,h);
+  // надписи мелом
+  ctx.fillStyle='rgba(220,240,220,0.8)';
+  ctx.font='bold '+Math.max(10,w*0.08)+'px Trebuchet MS';
+  ctx.textAlign='center';
+  ctx.fillText('S = V × t', x+w/2, y+h*0.35);
+  ctx.fillText('C = Ц × К', x+w/2, y+h*0.7);
+  // подсветка
+  const pulse=0.3+0.2*Math.sin(state.t*2);
+  ctx.strokeStyle=`rgba(0,229,255,${pulse})`;
+  ctx.lineWidth=2; ctx.setLineDash([5,5]);
+  ctx.strokeRect(x-6,y-6,w+12,h+12); ctx.setLineDash([]);
+}
+
+function drawDoor(){
+  const o=OBJ.door;
+  const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+  ctx.fillStyle='#1a1020'; ctx.fillRect(x-6,y-6,w+12,h+12);
+  const dg=ctx.createLinearGradient(x,y,x,y+h);
+  dg.addColorStop(0,'#3a2a48'); dg.addColorStop(1,'#1e1428');
+  ctx.fillStyle=dg; ctx.fillRect(x,y,w,h);
+  if(state.doorOpen){
+    const lg=ctx.createRadialGradient(x+w/2,y+h/2,5,x+w/2,y+h/2,w*1.2);
+    lg.addColorStop(0,'rgba(255,235,200,0.95)'); lg.addColorStop(0.4,'rgba(255,200,150,0.5)'); lg.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=lg; ctx.fillRect(x-w*0.3,y,w*1.6,h);
+  } else {
+    ctx.fillStyle='#c9a14a'; ctx.beginPath(); ctx.arc(x+w*0.85,y+h*0.55,Math.min(w,h)*0.04,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='rgba(80,50,100,0.5)'; ctx.lineWidth=1.5;
+    ctx.strokeRect(x+w*0.12,y+h*0.08,w*0.76,h*0.35);
+    ctx.strokeRect(x+w*0.12,y+h*0.52,w*0.76,h*0.4);
+  }
+}
+
+function drawKeypad(){
+  const o=OBJ.keypad;
+  const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+  ctx.fillStyle='#2a2a3a'; ctx.fillRect(x,y,w,h);
+  ctx.strokeStyle='rgba(0,229,255,0.4)'; ctx.lineWidth=1.5; ctx.strokeRect(x,y,w,h);
+  ctx.fillStyle=state.mathGameWon?'rgba(30,230,143,0.7)':'rgba(0,229,255,0.4)';
+  ctx.fillRect(x+w*0.15,y+h*0.1,w*0.7,h*0.18);
+}
+
+function drawPoppy(){
+  const o=OBJ.poppy;
+  const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+  const cx=x+w/2;
+  // ореол
+  ctx.save(); ctx.shadowColor='#00e5ff'; ctx.shadowBlur=25;
+  ctx.fillStyle='rgba(0,229,255,0.15)';
+  ctx.beginPath(); ctx.arc(cx, y+h*0.4, w*0.55, 0, Math.PI*2); ctx.fill();
+  ctx.restore();
+  if(drawSpriteFit(SPRITES.poppy, x, y, w, h)) return;
+  // fallback
+  ctx.fillStyle='#a01830';
+  ctx.beginPath(); ctx.moveTo(cx-w*0.35, y+h*0.5); ctx.lineTo(cx+w*0.35, y+h*0.5);
+  ctx.lineTo(cx+w*0.45, y+h*1.0); ctx.lineTo(cx-w*0.45, y+h*1.0); ctx.closePath(); ctx.fill();
+  ctx.fillStyle='#f0d0b8';
+  ctx.beginPath(); ctx.arc(cx, y+h*0.35, w*0.4, 0, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#c02040';
+  ctx.beginPath(); ctx.arc(cx, y+h*0.3, w*0.42, Math.PI, Math.PI*2); ctx.fill();
+  ctx.fillStyle='#1a2a5a';
+  ctx.beginPath(); ctx.arc(cx-w*0.12, y+h*0.36, w*0.05, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(cx+w*0.12, y+h*0.36, w*0.05, 0, Math.PI*2); ctx.fill();
+  ctx.strokeStyle='#a02040'; ctx.lineWidth=Math.max(1,w*0.03);
+  ctx.beginPath(); ctx.arc(cx, y+h*0.42, w*0.12, 0, Math.PI); ctx.stroke();
+}
+
+function drawTaskMarkers(){
+  // Задача 1
+  if(!state.task1Solved){
+    const o=OBJ.task1;
+    const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+    ctx.save(); ctx.shadowColor='#ffd166'; ctx.shadowBlur=20;
+    ctx.fillStyle='rgba(255,209,102,0.3)';
+    ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w*0.8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffd166'; ctx.font=`bold ${Math.max(18,w*0.5)}px Trebuchet MS`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('1', x+w/2, y+h/2);
+    ctx.restore();
+  }
+  // Задача 2
+  if(state.task1Solved && !state.task2Solved){
+    const o=OBJ.task2;
+    const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+    ctx.save(); ctx.shadowColor='#ffd166'; ctx.shadowBlur=20;
+    ctx.fillStyle='rgba(255,209,102,0.3)';
+    ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w*0.8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#ffd166'; ctx.font=`bold ${Math.max(18,w*0.5)}px Trebuchet MS`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('2', x+w/2, y+h/2);
+    ctx.restore();
+  }
+  // Мини-игра
+  if(state.task2Solved && !state.mathGameWon){
+    const o=OBJ.mathGame;
+    const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+    ctx.save(); ctx.shadowColor='#7dffcb'; ctx.shadowBlur=20;
+    ctx.fillStyle='rgba(125,255,203,0.3)';
+    ctx.beginPath(); ctx.arc(x+w/2, y+h/2, w*0.8, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle='#7dffcb'; ctx.font=`bold ${Math.max(18,w*0.5)}px Trebuchet MS`;
+    ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.fillText('⚡', x+w/2, y+h/2);
+    ctx.restore();
+  }
+}
+
+function drawHuggy(t){
+  if(!state.huggyVisible) return;
+  const o=OBJ.huggy;
+  const cx=(o.nx+o.nw/2)*W, cy=(o.ny+o.nh/2)*H;
+  const s=Math.min(o.nw*W, o.nh*H)*0.9;
+  state.huggyAlpha = Math.min(1, state.huggyAlpha + 0.025);
+  const alpha = state.huggyAlpha;
+  const breath = 1 + Math.sin(t*4)*0.03;
+
+  if(SPRITES.huggy && SPRITES.huggy.complete && SPRITES.huggy.naturalWidth > 0){
+    const w = o.nw*W*breath, h = o.nh*H*breath;
+    ctx.save(); ctx.globalAlpha = alpha;
+    ctx.shadowColor = '#ff1e56'; ctx.shadowBlur = 40;
+    ctx.drawImage(SPRITES.huggy, cx - w/2, cy - h/2, w, h);
+    ctx.restore(); return;
+  }
+  // fallback
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.translate(cx, cy); ctx.scale(breath, breath);
+  const bg = ctx.createRadialGradient(-s*0.1,-s*0.1,s*0.05,0,0,s*0.6);
+  bg.addColorStop(0,'#6fb3ff'); bg.addColorStop(0.6,'#2f6fc4'); bg.addColorStop(1,'#0a1f3d');
+  ctx.fillStyle = bg;
+  ctx.beginPath(); ctx.ellipse(0,0,s*0.35,s*0.5,0,0,Math.PI*2); ctx.fill();
+  ctx.fillStyle = '#2a5fa8';
+  ctx.beginPath(); ctx.moveTo(-s*0.22,-s*0.42); ctx.lineTo(-s*0.12,-s*0.62); ctx.lineTo(-s*0.03,-s*0.4); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(s*0.22,-s*0.42); ctx.lineTo(s*0.12,-s*0.62); ctx.lineTo(s*0.03,-s*0.4); ctx.closePath(); ctx.fill();
+  ctx.save(); ctx.shadowColor='#ff1e56'; ctx.shadowBlur=25;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.ellipse(-s*0.12,-s*0.12,s*0.09,s*0.12,0,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(s*0.12,-s*0.12,s*0.09,s*0.12,0,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+  ctx.fillStyle = '#000';
+  ctx.beginPath(); ctx.arc(-s*0.10,-s*0.10,s*0.045,0,Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(s*0.14,-s*0.10,s*0.045,0,Math.PI*2); ctx.fill();
+  ctx.save(); ctx.shadowColor='#ff1e56'; ctx.shadowBlur=20;
+  ctx.fillStyle = '#fff';
+  ctx.beginPath(); ctx.ellipse(0,s*0.18,s*0.25,s*0.12,0,0,Math.PI); ctx.fill();
+  ctx.restore();
+  ctx.strokeStyle = '#0a1f3d'; ctx.lineWidth = Math.max(1.5, s*0.012);
+  for(let i=-3;i<=3;i++){ ctx.beginPath();
+    ctx.moveTo(i*s*0.07, s*0.18); ctx.lineTo(i*s*0.08, s*0.3); ctx.stroke(); }
+  ctx.restore();
+}
+
+function drawHover(t){
+  if(!state.hover) return;
+  const o=OBJ[state.hover]; if(!o) return;
+  const x=o.nx*W, y=o.ny*H, w=o.nw*W, h=o.nh*H;
+  ctx.save();
+  ctx.strokeStyle='rgba(0,229,255,'+(0.5+0.3*Math.sin(t*4))+')';
+  ctx.lineWidth=2; ctx.setLineDash([5,5]);
+  ctx.strokeRect(x-5,y-5,w+10,h+10);
+  ctx.setLineDash([]); ctx.restore();
+}
+
+function draw(t){
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+  ctx.clearRect(0,0,W,H);
+
+  ctx.save();
+  if(state.shakeAmt > 0.5){
+    ctx.translate((Math.random()-0.5)*state.shakeAmt, (Math.random()-0.5)*state.shakeAmt);
+    state.shakeAmt *= 0.92;
+  }
+
+  drawBg();
+  drawDust(t);
+  drawBoard();
+  drawDoor();
+  drawKeypad();
+  drawPoppy();
+  drawTaskMarkers();
+  drawHuggy(t);
+  drawHover(t);
+
+  ctx.restore();
+}
+
+/* ==================== LOOP ==================== */
+let lastT = 0;
+function loop(ts){
+  const t = ts/1000; lastT = t; state.t = t;
+  draw(t);
+  requestAnimationFrame(loop);
+}
+
+/* ==================== START ==================== */
+document.getElementById('startBtn').addEventListener('click',()=>{
+  initAudio(); sfxClick();
+  document.getElementById('intro').classList.add('hidden');
+  state.gameStarted = true;
+  setTimeout(()=>showHint('Осмотрись. Начни с доски с теорией.'),400);
+});
+document.getElementById('nextBtn').addEventListener('click',()=>{
+  initAudio(); sfxClick();
+  const b=document.getElementById('nextBtn');
+  b.textContent='УРОВЕНЬ 3 СКОРО'; b.disabled=true; b.style.opacity='0.5';
+});
+
+// Hover
+cv.addEventListener('pointermove',e=>{
+  const rect=cv.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  let hover=null;
+  if(hit(px,py,OBJ.board,1.3)) hover='board';
+  else if(hit(px,py,OBJ.poppy,1.4)) hover='poppy';
+  else if(!state.task1Solved && hit(px,py,OBJ.task1,1.4)) hover='task1';
+  else if(state.task1Solved && !state.task2Solved && hit(px,py,OBJ.task2,1.4)) hover='task2';
+  else if(state.task2Solved && !state.mathGameWon && hit(px,py,OBJ.mathGame,1.4)) hover='mathGame';
+  else if(hit(px,py,OBJ.keypad,1.5) || hit(px,py,OBJ.door)) hover='door';
+  state.hover=hover; cv.style.cursor=hover?'pointer':'default';
+});
+cv.addEventListener('pointerdown',e=>{
+  const rect=cv.getBoundingClientRect(); const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  handleClick(px,py);
+});
+
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
