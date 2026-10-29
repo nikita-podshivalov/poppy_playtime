@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#05030a">
+<title>ПОБЕГ С ФАБРИКИ · Глава 5</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Jolly+Lodger&family=Oswald:wght@400;700&display=swap');
+
+  *{box-sizing:border-box;margin:0;padding:0;user-select:none;-webkit-tap-highlight-color:transparent}
+  html,body{height:100%;overflow:hidden;background:#05030a;font-family:'Trebuchet MS',system-ui,sans-serif;}
+  
+  /* Эффекты старого телевизора */
+  #scanlines{position:fixed;inset:0;pointer-events:none;z-index:50;
+    background:repeating-linear-gradient(0deg,rgba(0,0,0,0.18) 0px,rgba(0,0,0,0.18) 1px,transparent 1px,transparent 3px);
+    opacity:.35}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:49;
+    background:radial-gradient(ellipse at center,transparent 40%,rgba(0,0,0,.85) 100%)}
+  
+  canvas{position:fixed;inset:0;display:block;z-index:1;touch-action:none}
+
+  /* HUD */
+  #hud{position:fixed;top:0;left:0;right:0;z-index:20;
+    display:flex;justify-content:space-between;gap:8px;
+    padding:10px 14px;pointer-events:none}
+  .chip{padding:7px 12px;border-radius:8px;
+    font-size:clamp(10px,1.3vw,13px);font-weight:800;letter-spacing:2px;
+    background:rgba(10,6,18,.85);border:1px solid rgba(0,229,255,.25);
+    color:#8fd8ff;white-space:nowrap;text-transform:uppercase}
+  #objective{color:#ffd166;border-color:rgba(255,209,102,.35)}
+
+  /* Панель задачи */
+  #task-panel{position:fixed;top:60px;left:50%;transform:translateX(-50%);
+    width:min(700px,95vw);background:rgba(10,15,25,.95);
+    border:2px solid #00e5ff;border-radius:12px;padding:20px;
+    text-align:center;z-index:10;box-shadow:0 0 30px rgba(0,229,255,.2);
+    transition:opacity .3s,transform .3s;pointer-events:none}
+  #task-panel.hidden{opacity:0;transform:translate(-50%,-20px)}
+  .task-title{font-size:14px;color:#00e5ff;letter-spacing:3px;margin-bottom:10px;text-transform:uppercase}
+  .task-text{font-size:18px;line-height:1.5;color:#eaf9ff;margin-bottom:10px}
+  .task-q{font-size:22px;font-weight:900;color:#ffd166;line-height:1.3}
+
+  /* Подсказка для игр */
+  #game-hint{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+    background:rgba(0,229,255,.15);border:1px solid #00e5ff;color:#fff;
+    padding:12px 24px;border-radius:30px;font-weight:bold;font-size:16px;
+    z-index:10;opacity:0;transition:opacity .3s;text-align:center;
+    box-shadow:0 0 20px rgba(0,229,255,.3);pointer-events:none;letter-spacing:1px}
+  #game-hint.show{opacity:1}
+
+  /* Стартовый экран и Победа */
+  #intro,#victory{position:fixed;inset:0;z-index:40;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:16px;padding:24px;text-align:center;
+    background:radial-gradient(circle at 50% 45%,rgba(30,10,40,.93),rgba(2,1,6,.99))}
+  #intro.hidden,#victory.hidden{display:none}
+  .intro-kicker{font-size:11px;letter-spacing:8px;font-weight:800;
+    color:rgba(0,229,255,.55);font-family:'Oswald',sans-serif}
+  .intro-title{font-family:'Jolly Lodger',cursive;
+    font-size:clamp(40px,8vw,80px);line-height:0.9;color:#ffe8f0;
+    text-shadow:0 0 30px #ff1e56,0 0 80px rgba(255,30,86,.5);margin-bottom:10px}
+  .intro-sub{font-size:clamp(12px,1.6vw,15px);letter-spacing:5px;
+    font-weight:700;color:#b07cd0;font-family:'Oswald',sans-serif}
+  .intro-desc{font-size:clamp(14px,1.8vw,17px);line-height:1.65;
+    color:#c0a8d0;max-width:520px;margin-top:15px}
+  .intro-desc b{color:#ffd166}
+  .intro-btn{margin-top:15px;padding:16px 48px;font-family:'Oswald',sans-serif;
+    font-size:clamp(16px,2vw,20px);font-weight:900;letter-spacing:4px;
+    color:#1a0210;border:none;border-radius:12px;cursor:pointer;
+    background:linear-gradient(180deg,#ff5c8a,#d61e58);
+    box-shadow:0 0 36px rgba(255,30,86,.55);transition:all .15s}
+  .intro-btn:hover{transform:translateY(-2px);box-shadow:0 0 56px rgba(255,30,86,.9)}
+</style>
+</head>
+<body>
+
+<canvas id="cv"></canvas>
+<div id="vignette"></div>
+<div id="scanlines"></div>
+
+<div id="hud">
+  <div class="chip">ГЛАВА 5 · КОНВЕЙЕР</div>
+  <div class="chip" id="objective">ЗАДАЧА: Запусти конвейер (1/6)</div>
+</div>
+
+<div id="task-panel">
+  <div class="task-title" id="t-title">ИСПЫТАНИЕ 1</div>
+  <div class="task-text" id="t-text">...</div>
+  <div class="task-q" id="t-q">...</div>
+</div>
+
+<div id="game-hint">...</div>
+
+<!-- Стартовый экран -->
+<div id="intro">
+  <div class="intro-kicker">PLAYTIME CO. · ГЛАВА 5</div>
+  <h1 class="intro-title">СБОРОЧНЫЙ<br>КОНВЕЙЕР</h1>
+  <div class="intro-sub">МАТЕМАТИЧЕСКИЙ ПОБЕГ</div>
+  <div class="intro-desc">
+    Ты спустился на заводской уровень.<br>
+    Конвейер остановлен, а ворота заперты. Чтобы запустить механизмы, придётся пройти 6 испытаний.<br><br>
+    <b>Тебя ждут три разных типа задач по два раза. Будь внимателен!</b>
+  </div>
+  <button class="intro-btn" id="startBtn">ЗАПУСТИТЬ КОНВЕЙЕР</button>
+</div>
+
+<!-- Экран победы -->
+<div id="victory" class="hidden">
+  <div class="intro-kicker">ГЛАВА 5 · ЗАВЕРШЕНА</div>
+  <h1 class="intro-title">МЕХАНИЗМЫ<br>ЗАПУЩЕНЫ</h1>
+  <div class="intro-desc">
+    Шестерёнки закрутились, и дверь с грохотом отворилась.<br>
+    Позади остался шум работающих машин.<br><br>
+    <b>Ты отлично справился с составными задачами!</b>
+  </div>
+  <button class="intro-btn" id="nextBtn">ПЕРЕЙТИ В ГЛАВУ 6 →</button>
+</div>
+
+<script>
+// ==========================================
+// ЗВУКИ
+// ==========================================
+const actx = new (window.AudioContext || window.webkitAudioContext)();
+function playSound(freq, type, dur, vol = 0.1) {
+  if (actx.state === 'suspended') actx.resume();
+  const osc = actx.createOscillator(), gain = actx.createGain();
+  osc.type = type; osc.frequency.value = freq;
+  gain.gain.setValueAtTime(vol, actx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, actx.currentTime + dur);
+  osc.connect(gain); gain.connect(actx.destination);
+  osc.start(); osc.stop(actx.currentTime + dur);
+}
+
+// ==========================================
+// КАНВАС И СОСТОЯНИЕ
+// ==========================================
+const canvas = document.getElementById('cv');
+const ctx = canvas.getContext('2d');
+let W, H;
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize); resize();
+
+const state = {
+  level: 0, 
+  mode: 'idle',
+  mouse: { x: 0, y: 0, down: false },
+  activeItems: [],
+  draggingItem: null,
+  cube: { x: 150, y: 0, vy: 0, size: 40, grounded: true },
+  speed: 6,
+  targetZone: { x: 0, y: 0, w: 0, h: 0 },
+  shake: 0,
+  bgOffset: 0
+};
+
+// ==========================================
+// ДАННЫЕ ЗАДАЧ (6 ШТУК)
+// ==========================================
+const tasks = [
+  // --- ТИП 1: ПЕРЕТАСКИВАНИЕ ---
+  { 
+    mode: 'drag',
+    text: 'На конвейер поставили 4 коробки. В каждой коробке по 8 игрушек.',
+    q: 'Перетащи ящик с общим количеством игрушек в правую зону!',
+    answer: 32,
+    options: [24, 32, 12],
+    hint: 'Умножь количество коробок на число игрушек: 4 × 8.'
+  },
+  // --- ТИП 2: ПРЫЖКИ ---
+  { 
+    mode: 'jump',
+    text: 'На складе было 50 деталей. 15 деталей увезли в магазин.',
+    q: 'Прыгни на платформу с правильным ответом! (Пробел или Клик)',
+    answer: 35,
+    options: [45, 35, 25],
+    hint: 'Вычти увезённые детали: 50 - 15.'
+  },
+  // --- ТИП 3: ТИР ---
+  { 
+    mode: 'clicker',
+    text: 'Привезли 3 ящика по 10 роботов, и ещё 5 роботов лежат отдельно.',
+    q: 'Кликни по дрону с правильным ответом!',
+    answer: 35,
+    options: [30, 35, 15],
+    hint: 'Сначала найди роботов в ящиках (3 × 10), затем прибавь 5.'
+  },
+  // --- ТИП 1: ПЕРЕТАСКИВАНИЕ (Второй раз) ---
+  { 
+    mode: 'drag',
+    text: 'В цех завезли 6 коробок. В каждой коробке лежит по 9 кукол.',
+    q: 'Перетащи ящик с общим количеством кукол в правую зону!',
+    answer: 54,
+    options: [45, 54, 63],
+    hint: 'Умножь коробки на кукол: 6 × 9.'
+  },
+  // --- ТИП 2: ПРЫЖКИ (Второй раз) ---
+  { 
+    mode: 'jump',
+    text: 'На первой линии собрали 40 машинок, а на второй — ещё 28.',
+    q: 'Прыгни на платформу с общим количеством машинок!',
+    answer: 68,
+    options: [58, 68, 78],
+    hint: 'Сложи машинки с двух линий: 40 + 28.'
+  },
+  // --- ТИП 3: ТИР (Второй раз) ---
+  { 
+    mode: 'clicker',
+    text: 'Было 5 ящиков по 12 мишек. 10 мишек отдали в детский сад.',
+    q: 'Кликни по дрону с количеством оставшихся мишек!',
+    answer: 50,
+    options: [60, 50, 70],
+    hint: 'Сначала узнай, сколько было всего (5 × 12), потом вычти 10.'
+  }
+];
+
+// ==========================================
+// ИНИЦИАЛИЗАЦИЯ
+// ==========================================
+function initTask() {
+  if (state.level >= tasks.length) {
+    document.getElementById('victory').classList.remove('hidden');
+    document.getElementById('task-panel').classList.add('hidden');
+    document.getElementById('game-hint').classList.remove('show');
+    playSound(800, 'sine', 0.5);
+    return;
+  }
+
+  const task = tasks[state.level];
+  state.mode = task.mode;
+  state.activeItems = [];
+  state.draggingItem = null;
+  state.shake = 0;
+
+  // Обновляем интерфейс
+  document.getElementById('objective').textContent = `ЗАДАЧА: Запусти конвейер (${state.level + 1}/${tasks.length})`;
+  document.getElementById('t-title').textContent = `ИСПЫТАНИЕ ${state.level + 1} ИЗ ${tasks.length}`;
+  document.getElementById('t-text').textContent = task.text;
+  document.getElementById('t-q').textContent = task.q;
+  document.getElementById('t-q').style.color = "#ffd166";
+  document.getElementById('task-panel').classList.remove('hidden');
+
+  const hintEl = document.getElementById('game-hint');
+  
+  if (task.mode === 'drag') {
+    hintEl.textContent = "🖱 Зажми и перетащи ящик с ответом в зелёную зону.";
+    state.targetZone = { x: W - 250, y: H / 2 - 100, w: 200, h: 200 };
+    
+    task.options.forEach((opt, i) => {
+      state.activeItems.push({
+        val: opt, x: W / 2 - 200 + i * 150, y: H / 2 + 100, w: 100, h: 100,
+        color: '#8fd8ff', isTarget: false
+      });
+    });
+  } 
+  else if (task.mode === 'jump') {
+    hintEl.textContent = "Нажми ПРОБЕЛ или КЛИКНИ, чтобы прыгнуть на нужную платформу!";
+    state.cube = { x: 150, y: H - 150, vy: 0, size: 40, grounded: true };
+    
+    task.options.forEach((opt, i) => {
+      state.activeItems.push({
+        val: opt, x: W + 400 + i * 400, y: H - 120, w: 120, h: 120,
+        color: '#ffd166', isTarget: false, hit: false
+      });
+    });
+  } 
+  else if (task.mode === 'clicker') {
+    hintEl.textContent = "🎯 Кликай по летающим дронам с правильным ответом!";
+    
+    task.options.forEach((opt) => {
+      state.activeItems.push({
+        val: opt, x: Math.random() * (W - 200) + 100, y: Math.random() * (H - 300) + 150,
+        vx: (Math.random() > 0.5 ? 1 : -1) * 2.5, vy: (Math.random() > 0.5 ? 1 : -1) * 2.5,
+        r: 45, color: '#ff3b6b', isTarget: false
+      });
+    });
+  }
+
+  hintEl.classList.add('show');
+  playSound(400, 'square', 0.1);
+}
+
+// ==========================================
+// УПРАВЛЕНИЕ
+// ==========================================
+canvas.addEventListener('pointerdown', (e) => {
+  if (state.mode === 'idle') return;
+  const rect = canvas.getBoundingClientRect();
+  const px = e.clientX - rect.left;
+  const py = e.clientY - rect.top;
+  state.mouse.down = true;
+  state.mouse.x = px;
+  state.mouse.y = py;
+
+  if (state.mode === 'jump') {
+    if (state.cube.grounded) {
+      state.cube.vy = -16;
+      state.cube.grounded = false;
+      playSound(500, 'sine', 0.1);
+    }
+  }
+  
+  if (state.mode === 'drag') {
+    for (let item of state.activeItems) {
+      if (px > item.x && px < item.x + item.w && py > item.y && py < item.y + item.h) {
+        state.draggingItem = item;
+        playSound(300, 'square', 0.05);
+        break;
+      }
+    }
+  }
+
+  if (state.mode === 'clicker') {
+    for (let i = state.activeItems.length - 1; i >= 0; i--) {
+      const item = state.activeItems[i];
+      const dist = Math.hypot(px - item.x, py - item.y);
+      if (dist < item.r) {
+        checkAnswer(item);
+        return;
+      }
+    }
+  }
+});
+
+canvas.addEventListener('pointermove', (e) => {
+  if (state.mode === 'idle') return;
+  const rect = canvas.getBoundingClientRect();
+  state.mouse.x = e.clientX - rect.left;
+  state.mouse.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener('pointerup', () => {
+  state.mouse.down = false;
+  if (state.mode === 'drag' && state.draggingItem) {
+    const z = state.targetZone;
+    const item = state.draggingItem;
+    if (item.x + item.w/2 > z.x && item.x + item.w/2 < z.x + z.w &&
+        item.y + item.h/2 > z.y && item.y + item.h/2 < z.y + z.h) {
+      checkAnswer(item);
+    }
+    state.draggingItem = null;
+  }
+});
+
+window.addEventListener('keydown', (e) => {
+  if (e.code === 'Space' && state.mode === 'jump') {
+    e.preventDefault();
+    if (state.cube.grounded) {
+      state.cube.vy = -16;
+      state.cube.grounded = false;
+      playSound(500, 'sine', 0.1);
+    }
+  }
+});
+
+// ==========================================
+// ЛОГИКА ОТВЕТОВ
+// ==========================================
+function checkAnswer(item) {
+  if (state.mode === 'idle') return; // Защита от двойных кликов
+  const task = tasks[state.level];
+  
+  if (item.val === task.answer) {
+    state.mode = 'idle'; // Блокируем ввод
+    playSound(800, 'sine', 0.3);
+    item.color = '#1ee68f';
+    document.getElementById('task-panel').classList.add('hidden');
+    document.getElementById('game-hint').classList.remove('show');
+    
+    state.level++;
+    setTimeout(initTask, 1200);
+  } else {
+    playSound(150, 'sawtooth', 0.4);
+    state.shake = 25;
+    document.getElementById('t-q').textContent = "ОШИБКА! " + task.hint;
+    document.getElementById('t-q').style.color = "#ff3b6b";
+    
+    if (state.mode === 'drag') {
+      item.x = W / 2 - 200 + Math.random() * 200;
+      item.y = H / 2 + 100;
+    }
+    setTimeout(() => {
+      if(state.level < tasks.length && state.mode !== 'idle') {
+        document.getElementById('t-q').textContent = tasks[state.level].q;
+        document.getElementById('t-q').style.color = "#ffd166";
+      }
+    }, 3000);
+  }
+}
+
+// ==========================================
+// ЦИКЛ
+// ==========================================
+function update() {
+  if (state.shake > 0.5) state.shake *= 0.9;
+  state.bgOffset = (state.bgOffset + 2) % 80;
+
+  if (state.mode === 'drag' && state.draggingItem) {
+    state.draggingItem.x = state.mouse.x - state.draggingItem.w / 2;
+    state.draggingItem.y = state.mouse.y - state.draggingItem.h / 2;
+  }
+
+  if (state.mode === 'jump') {
+    state.cube.vy += 0.8;
+    state.cube.y += state.cube.vy;
+    if (state.cube.y > H - 150) {
+      state.cube.y = H - 150;
+      state.cube.vy = 0;
+      state.cube.grounded = true;
+    }
+    
+    state.activeItems.forEach(item => {
+      item.x -= state.speed;
+      if (state.cube.x + state.cube.size > item.x && 
+          state.cube.x < item.x + item.w &&
+          state.cube.y + state.cube.size > item.y && 
+          state.cube.y < item.y + item.h) {
+        if (!item.hit) {
+          item.hit = true;
+          checkAnswer(item);
+        }
+      }
+    });
+  }
+
+  if (state.mode === 'clicker') {
+    state.activeItems.forEach(item => {
+      item.x += item.vx;
+      item.y += item.vy;
+      if (item.x - item.r < 0 || item.x + item.r > W) item.vx *= -1;
+      if (item.y - item.r < 150 || item.y + item.r > H - 50) item.vy *= -1;
+    });
+  }
+}
+
+function draw() {
+  ctx.fillStyle = '#05030a';
+  ctx.fillRect(0, 0, W, H);
+  
+  ctx.save();
+  if (state.shake > 1) {
+    ctx.translate((Math.random() - 0.5) * state.shake, (Math.random() - 0.5) * state.shake);
+  }
+
+  // Конвейерная лента на фоне
+  ctx.strokeStyle = 'rgba(0, 229, 255, 0.08)';
+  ctx.lineWidth = 30;
+  for (let i = -100; i < W + 100; i += 80) {
+    ctx.beginPath();
+    ctx.moveTo(i + state.bgOffset, H * 0.7);
+    ctx.lineTo(i + state.bgOffset - 100, H);
+    ctx.stroke();
+  }
+  ctx.strokeStyle = 'rgba(255, 59, 107, 0.3)';
+  ctx.lineWidth = 4;
+  ctx.beginPath(); ctx.moveTo(0, H * 0.7); ctx.lineTo(W, H * 0.7); ctx.stroke();
+
+  // Отрисовка элементов
+  if (state.mode === 'drag') {
+    const z = state.targetZone;
+    ctx.fillStyle = 'rgba(30, 230, 143, 0.1)';
+    ctx.strokeStyle = '#1ee68f';
+    ctx.lineWidth = 3;
+    ctx.setLineDash([10, 10]);
+    ctx.fillRect(z.x, z.y, z.w, z.h);
+    ctx.strokeRect(z.x, z.y, z.w, z.h);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#1ee68f';
+    ctx.font = 'bold 20px "Oswald", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('ГРУЗОВОЙ ОТСЕК', z.x + z.w / 2, z.y - 20);
+
+    state.activeItems.forEach(item => {
+      ctx.fillStyle = item.color;
+      ctx.fillRect(item.x, item.y, item.w, item.h);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 32px "Oswald", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.val, item.x + item.w / 2, item.y + item.h / 2);
+    });
+  } 
+  else if (state.mode === 'jump') {
+    ctx.fillStyle = '#00e5ff';
+    ctx.shadowColor = '#00e5ff'; ctx.shadowBlur = 15;
+    ctx.fillRect(state.cube.x, state.cube.y, state.cube.size, state.cube.size);
+    ctx.shadowBlur = 0;
+    
+    state.activeItems.forEach(item => {
+      ctx.fillStyle = item.color;
+      ctx.fillRect(item.x, item.y, item.w, item.h);
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 32px "Oswald", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.val, item.x + item.w / 2, item.y + item.h / 2);
+    });
+  } 
+  else if (state.mode === 'clicker') {
+    state.activeItems.forEach(item => {
+      ctx.fillStyle = item.color;
+      ctx.shadowColor = '#ff3b6b'; ctx.shadowBlur = 15;
+      ctx.beginPath(); ctx.arc(item.x, item.y, item.r, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0;
+      
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(item.x - 25, item.y - 25, 12, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(item.x + 25, item.y - 25, 12, 0, Math.PI*2); ctx.fill();
+      
+      ctx.fillStyle = '#000';
+      ctx.font = 'bold 28px "Oswald", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(item.val, item.x, item.y);
+    });
+  }
+
+  ctx.restore();
+}
+
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ==========================================
+// СТАРТ
+// ==========================================
+document.getElementById('startBtn').addEventListener('click', () => {
+  initAudio();
+  playSound(600, 'square', 0.1);
+  document.getElementById('intro').classList.add('hidden');
+  initTask();
+});
+
+document.getElementById('nextBtn').addEventListener('click', () => {
+  initAudio();
+  playSound(600, 'square', 0.1);
+  window.location.href = 'level6.html';
+});
+
+function initAudio() { if (actx.state === 'suspended') actx.resume(); }
+
+loop();
+</script>
+</body>
+</html>
